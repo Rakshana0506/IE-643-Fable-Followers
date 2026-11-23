@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plant lesion analysis</title>
+<style>
+:root{
+  --bg:#f4f6f3; --panel:#ffffff; --ink:#17231c; --muted:#5d6b62; --line:#dfe5df; --soft:#eef2ed;
+  --accent:#1f7a4d; --accent-ink:#ffffff; --warn:#b4531a; --bad:#c0392b; --good:#1f7a4d;
+  --yellow:#ffd700; --blue:#2878ff; --red:#e63228;
+  --radius:12px; --shadow:0 1px 2px rgba(20,35,25,.06),0 6px 20px rgba(20,35,25,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1511; --panel:#161e19; --ink:#e6eee8; --muted:#93a398; --line:#26332b; --soft:#1c2620;
+    --accent:#3fb97a; --accent-ink:#06150d; --warn:#e08a4f; --bad:#ef6b5c; --good:#3fb97a; --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1511; --panel:#161e19; --ink:#e6eee8; --muted:#93a398; --line:#26332b; --soft:#1c2620;
+  --accent:#3fb97a; --accent-ink:#06150d; --warn:#e08a4f; --bad:#ef6b5c; --good:#3fb97a; --shadow:none;
+}
+*{box-sizing:border-box}
+html{color-scheme:light dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+h1,h2,h3{margin:0;line-height:1.2}
+.wrap{max-width:1320px;margin:0 auto;padding:0 16px 64px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:22px 0 14px}
+header.top h1{font-size:22px;letter-spacing:-.01em}
+header.top p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:8px 12px;font:inherit;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;padding:11px 16px;width:100%}
+.btn.primary:disabled{opacity:.55;cursor:not-allowed}
+.layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:980px){.layout{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.controls{padding:16px;position:sticky;top:12px;display:grid;gap:14px}
+@media (max-width:980px){.controls{position:static}}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;background:var(--soft);transition:border-color .15s}
+.drop.over,.drop:hover{border-color:var(--accent)}
+.drop strong{color:var(--ink)}
+.drop small{display:block;margin-top:4px}
+.preview{margin-top:10px;display:none}
+.preview img,.preview video{width:100%;max-height:200px;object-fit:contain;border-radius:8px;background:#000}
+.preview .fname{font-size:12.5px;color:var(--muted);margin-top:4px;word-break:break-all}
+fieldset{border:0;padding:0;margin:0;display:grid;gap:10px}
+legend{font-weight:600;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;padding:0}
+label.f{display:grid;gap:4px;font-size:13.5px}
+label.f span.h{color:var(--muted);font-size:12px}
+select,input[type=number]{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:13.5px}
+.chk input{margin-top:3px}
+.hidden{display:none!important}
+.progress{padding:16px;margin-bottom:20px}
+.bar{height:8px;background:var(--soft);border-radius:99px;overflow:hidden;margin:10px 0}
+.bar>i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+.progress .msg{font-weight:600}
+.progress .meta{color:var(--muted);font-size:13px}
+.progress ol{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:12.5px;max-height:120px;overflow:auto}
+.err{border-color:var(--bad);color:var(--bad);padding:14px 16px;margin-bottom:20px}
+.empty{padding:40px 24px;text-align:center;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.tile{padding:14px 16px}
+.tile .k{color:var(--muted);font-size:12.5px}
+.tile .v{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:2px}
+.tile .s{color:var(--muted);font-size:12.5px;margin-top:2px}
+.overview{padding:14px;margin-bottom:20px}
+.overview img{width:100%;border-radius:8px;display:block;cursor:zoom-in}
+.plant{margin-bottom:22px;overflow:hidden}
+.plant>header{padding:16px 18px;border-bottom:1px solid var(--line);display:grid;gap:10px}
+.plant h2{font-size:18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--soft);border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:13px}
+.chip b{font-weight:600}
+.chip.ok{border-color:var(--good);color:var(--good)}
+.chip.bad{border-color:var(--bad);color:var(--bad)}
+.sub{color:var(--muted);font-size:13px}
+.sec{padding:16px 18px}
+.sec+.sec{border-top:1px solid var(--line)}
+.sec h3{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+.imgs{display:grid;gap:10px}
+.imgs.c6{grid-template-columns:repeat(3,minmax(0,1fr))}
+.imgs.c5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.imgs.c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1100px){.imgs.c5{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.imgs.c6,.imgs.c5,.imgs.c4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+figure{margin:0}
+figure img{width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--soft);border-radius:8px;display:block;cursor:zoom-in;border:1px solid var(--line)}
+figure.wide img{aspect-ratio:auto}
+figure.px img{image-rendering:pixelated}
+figcaption{font-size:12.5px;color:var(--muted);margin-top:4px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+table.m{width:100%;border-collapse:collapse;font-size:13.5px}
+table.m th,table.m td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+table.m th:first-child,table.m td:first-child{text-align:left}
+table.m thead th{color:var(--muted);font-weight:600;font-size:12.5px}
+table.m td.best{font-weight:700;color:var(--good)}
+table.m td small{color:var(--muted);font-weight:400}
+table.m tr.grp td{background:var(--soft);font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.tw{overflow-x:auto}
+details.leaf{border:1px solid var(--line);border-radius:10px;margin-top:10px;background:var(--panel)}
+details.leaf>summary{cursor:pointer;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;list-style:none}
+details.leaf>summary::-webkit-details-marker{display:none}
+details.leaf>summary::before{content:"▸";color:var(--muted)}
+details.leaf[open]>summary::before{content:"▾"}
+details.leaf .body{padding:4px 12px 14px;display:grid;gap:14px}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.86);display:none;align-items:center;justify-content:center;z-index:50;padding:20px;cursor:zoom-out}
+.lightbox.on{display:flex}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;image-rendering:auto}
+.lightbox img.px{image-rendering:pixelated}
+.foot{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Plant lesion analysis</h1>
+      <p>Upload a photo or a video. Each plant is degraded, restored with bicubic and with SR3, and its lesions are compared with the original.</p>
+    </div>
+    <button class="btn" id="theme" type="button" aria-label="Toggle light / dark">Theme</button>
+  </header>
+
+  <div class="layout">
+    <aside class="card controls">
+      <div>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose an image or video">
+          <strong>Drop an image or a video here</strong>
+          <small>or click to choose a file</small>
+        </div>
+        <input id="file" type="file" accept="image/*,video/*" hidden>
+        <div class="preview" id="preview"></div>
+      </div>
+
+      <fieldset>
+        <legend>Settings</legend>
+        <label class="f">Sampler
+          <select id="sampler"></select>
+        </label>
+        <label class="f" id="stepsWrap">Sampling steps
+          <input id="steps" type="number" min="1" max="1000" step="1">
+          <span class="h">Fewer steps are faster.</span>
+        </label>
+        <label class="f">Degradation
+          <select id="degrade">
+            <option value="sr3_ft">Degraded (SR3 training degradation)</option>
+            <option value="simple">Simple (blur + noise + JPEG)</option>
+          </select>
+        </label>
+        <label class="chk"><input id="maskBg" type="checkbox" checked><span>Remove background</span></label>
+        <label class="f" id="bgWrap">Only if background is at least (% of crop)
+          <input id="bgPct" type="number" min="0" max="100" step="1" value="30">
+        </label>
+      </fieldset>
+
+      <fieldset id="videoOpts" class="hidden">
+        <legend>Video</legend>
+        <label class="f">Frames sampled per second
+          <input id="fps" type="number" min="0.2" max="30" step="0.1">
+          <span class="h">Raise it if the camera moves fast. Each plant is analysed in its best frame.</span>
+        </label>
+      </fieldset>
+
+      <button class="btn primary" id="run" type="button" disabled>Run analysis</button>
+    </aside>
+
+    <main>
+      <div class="card progress hidden" id="progress">
+        <div class="msg" id="pmsg">Starting</div>
+        <div class="bar"><i id="pbar"></i></div>
+        <div class="meta" id="pmeta"></div>
+        <ol id="plog"></ol>
+      </div>
+      <div class="card err hidden" id="error"></div>
+      <div class="card empty" id="empty">Choose a file and run the analysis. Results appear here.</div>
+      <div id="results"></div>
+    </main>
+  </div>
+</div>
+<div class="lightbox" id="lb"><img id="lbimg" alt=""></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (v, d = 1) => v == null || Number.isNaN(v) ? "n/a" : Number(v).toFixed(d);
+const int = v => v == null ? "n/a" : Math.round(v).toLocaleString();
+let file = null, isVideo = false, timer = null;
+
+/* ---------- theme ---------- */
+(function(){
+  let t = null; try { t = localStorage.getItem("theme"); } catch(e){}
+  if (t) document.documentElement.dataset.theme = t;
+  $("theme").onclick = () => {
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("theme", next); } catch(e){}
+  };
+})();
+
+/* ---------- config ---------- */
+fetch("/api/config").then(r => r.json()).then(c => {
+  const d = c.defaults;
+  $("sampler").innerHTML = c.samplers.map(x => `<option value="${esc(x.id)}">${esc(x.label)}</option>`).join("");
+  $("sampler").value = d.sampler; $("degrade").value = d.degrade_mode; syncSampler();
+  $("steps").value = d.steps; $("fps").value = d.sample_fps;
+  $("bgPct").value = Math.round(d.mask_min_bg_frac * 100);
+}).catch(() => showError("Could not reach the server."));
+const syncSampler = () => $("stepsWrap").classList.toggle("hidden", $("sampler").value === "ancestral");
+$("sampler").onchange = syncSampler;
+$("maskBg").onchange = () => $("bgWrap").classList.toggle("hidden", !$("maskBg").checked);
+
+/* ---------- file picking ---------- */
+const drop = $("drop");
+drop.onclick = () => $("file").click();
+drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } };
+["dragover","dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
+$("file").onchange = e => { if (e.target.files[0]) setFile(e.target.files[0]); };
+function setFile(f){
+  file = f; isVideo = f.type.startsWith("video/") || /\.(mp4|mov|avi|mkv|webm|m4v|mpe?g)$/i.test(f.name);
+  const url = URL.createObjectURL(f);
+  $("preview").style.display = "block";
+  $("preview").innerHTML = (isVideo ? `<video src="${url}" controls muted></video>` : `<img src="${url}" alt="">`) +
+    `<div class="fname">${esc(f.name)} (${(f.size/1048576).toFixed(1)} MB, ${isVideo ? "video" : "image"})</div>`;
+  $("videoOpts").classList.toggle("hidden", !isVideo);
+  $("run").disabled = false;
+}
+
+/* ---------- run + poll ---------- */
+$("run").onclick = async () => {
+  if (!file) return;
+  clearError(); $("results").innerHTML = ""; $("empty").classList.add("hidden");
+  $("run").disabled = true; $("progress").classList.remove("hidden");
+  setProgress("Uploading", 0.01, 0, []);
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("sampler", $("sampler").value); fd.append("steps", $("steps").value);
+  fd.append("degrade_mode", $("degrade").value);
+  fd.append("mask_background", $("maskBg").checked ? "1" : "0");
+  fd.append("mask_min_bg_pct", $("bgPct").value);
+  fd.append("sample_fps", $("fps").value);
+  try {
+    const r = await fetch("/api/run", {method: "POST", body: fd});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `Server answered ${r.status}`);
+    poll(j.job_id);
+  } catch (e) { fail(e.message); }
+};
+function poll(id){
+  clearInterval(timer);
+  timer = setInterval(async () => {
+    try {
+      const r = await fetch(`/api/jobs/${id}`); const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `Server answered ${r.status}`);
+      const last = j.progress[j.progress.length - 1] || "Working";
+      setProgress(last, j.frac, j.elapsed, j.progress);
+      if (j.status === "done") { clearInterval(timer); finish(id, j.result); }
+      if (j.status === "error") { clearInterval(timer); fail(j.error); }
+    } catch (e) { clearInterval(timer); fail(e.message); }
+  }, 1500);
+}
+function setProgress(msg, frac, elapsed, log){
+  $("pmsg").textContent = msg; $("pbar").style.width = Math.round(frac * 100) + "%";
+  $("pmeta").textContent = `${Math.round(frac * 100)}%  |  ${Math.round(elapsed)} s elapsed`;
+  $("plog").innerHTML = log.map(m => `<li>${esc(m)}</li>`).join("");
+}
+function fail(msg){ $("progress").classList.add("hidden"); $("run").disabled = false; showError(msg); }
+function showError(m){ const e = $("error"); e.textContent = m; e.classList.remove("hidden"); }
+function clearError(){ $("error").classList.add("hidden"); }
+function finish(id, res){
+  $("progress").classList.add("hidden"); $("run").disabled = false; render(id, res);
+}
+
+/* ---------- rendering ---------- */
+const ROWS = [
+  ["IoU with original lesions", a => num(a.iou, 3), "high", a => a.iou],
+  ["Overlap area (% of original lesion area)", a => a.overlap_pct_of_original == null ? "n/a" : num(a.overlap_pct_of_original, 1) + "%", "high", a => a.overlap_pct_of_original],
+  ["New lesion area (% of leaf)", a => num(a.new_pct_of_leaf, 2) + "%", "low", a => a.new_pct_of_leaf],
+  ["Lost lesion area (% of leaf)", a => num(a.lost_pct_of_leaf, 2) + "%", "low", a => a.lost_pct_of_leaf],
+  ["Lesions on original", a => int(a.lesions_original), null, null],
+  ["Lesions found", a => int(a.lesions_found), null, null],
+  ["Kept", a => `${int(a.kept)} <small>(${int(a.shifted)} shifted)</small>`, "high", a => a.kept],
+  ["Lost (only on original)", a => int(a.lost), "low", a => a.lost],
+  ["New (not on original)", a => int(a.new), "low", a => a.new],
+];
+function metricsTable(m, sev){
+  const B = m.bicubic, S = m.sr3;
+  let h = `<div class="tw"><table class="m"><thead><tr><th>vs original crop</th><th>Bicubic</th><th>SR3</th></tr></thead><tbody>`;
+  for (const [label, fmt, better, val] of ROWS){
+    let cb = "", cs = "";
+    if (better){
+      const vb = val(B), vs = val(S);
+      if (vb !== vs){ const sWins = better === "high" ? vs > vb : vs < vb; (sWins ? (cs = "best") : (cb = "best")); }
+    }
+    h += `<tr><td>${esc(label)}</td><td class="${cb}">${fmt(B)}</td><td class="${cs}">${fmt(S)}</td></tr>`;
+  }
+  if (sev){
+    const eb = Math.abs(sev.bicubic - sev.original), es = Math.abs(sev.sr3 - sev.original);
+    h += `<tr><td>Severity (original ${num(sev.original, 1)}%)</td><td class="${eb < es ? "best" : ""}">${num(sev.bicubic, 1)}% <small>(error ${num(eb, 1)})</small></td>
+      <td class="${es < eb ? "best" : ""}">${num(sev.sr3, 1)}% <small>(error ${num(es, 1)})</small></td></tr>`;
+  }
+  return h + `</tbody></table></div><div class="sub" style="margin-top:6px">Green = better of the two. Lesions on the original crop are the reference, not ground truth.</div>`;
+}
+const fig = (src, cap, cls = "") => `<figure class="${cls}"><img src="${esc(src)}" alt="${esc(cap)}" loading="lazy" data-zoom><figcaption>${esc(cap)}</figcaption></figure>`;
+const legend = `<div class="legend"><span>Comparison images:</span><span><i style="background:var(--yellow)"></i>found on both</span><span><i style="background:var(--blue)"></i>only on the original (missed)</span><span><i style="background:var(--red)"></i>not on the original (new)</span></div>`;
+
+function render(id, r){
+  const T = r.totals;
+  let h = "";
+  h += `<div class="foot"><a class="btn" href="/api/jobs/${esc(id)}/zip">Download all results (zip)</a></div>`;
+  if (!r.plants.length){
+    h += `<div class="card empty">No plant was found${r.mode === "video" ? " that appears in enough frames. Try a higher sampling rate." : "."}</div>`;
+    $("results").innerHTML = h; return;
+  }
+  const keptPct = a => a.lesions_original ? 100 * a.kept / a.lesions_original : null;
+  const errs = k => r.plants.reduce((t, p) => t + Math.abs(p.severity[k] - p.severity.original), 0) / r.plants.length;
+  h += `<div class="tiles">
+    <div class="card tile"><div class="k">Plants</div><div class="v">${r.n_plants}</div><div class="s">${r.n_leaves} leaves, ${num(r.seconds, 0)} s</div></div>
+    <div class="card tile"><div class="k">Original lesions kept</div><div class="v">${num(keptPct(T.bicubic), 0)}% / ${num(keptPct(T.sr3), 0)}%</div><div class="s">bicubic / SR3</div></div>
+    <div class="card tile"><div class="k">New lesion area</div><div class="v">${num(T.bicubic.new_pct_of_leaf, 1)}% / ${num(T.sr3.new_pct_of_leaf, 1)}%</div><div class="s">of leaf area, bicubic / SR3</div></div>
+    <div class="card tile"><div class="k">Severity error</div><div class="v">${num(errs("bicubic"), 1)} / ${num(errs("sr3"), 1)}</div><div class="s">points, bicubic / SR3</div></div>
+  </div>`;
+  if (r.overview) h += `<div class="card overview"><div class="sub" style="margin-bottom:8px">Plants found in the photo</div><img src="${esc(r.overview)}" alt="Plants found" data-zoom></div>`;
+
+  for (const p of r.plants){
+    h += `<section class="card plant">
+      <header>
+        <h2>Plant ${p.id}</h2>
+        <div class="chips">
+                    <span class="chip">${p.n_leaves} leaf crop${p.n_leaves === 1 ? "" : "s"}</span>
+        </div>
+        ${p.time_s != null ? `<div class="sub">Best view at ${num(p.time_s, 1)} s in the video (plant seen in ${p.frames_seen} sampled frames). <a href="${esc(p.frame_image)}" target="_blank" rel="noopener">Open the frame</a></div>` : ""}
+      </header>
+      <div class="sec"><h3>Whole plant</h3>
+        <div class="imgs c6">
+          ${fig(p.images.crop, "Plant crop")}
+          ${fig(p.images.lesions_original, "Lesions: original")}
+          ${fig(p.images.lesions_bicubic, "Lesions: bicubic")}
+          ${fig(p.images.lesions_sr3, "Lesions: SR3")}
+          ${fig(p.images.bicubic_vs_original, "Bicubic vs original")}
+          ${fig(p.images.sr3_vs_original, "SR3 vs original")}
+        </div>${legend}
+      </div>
+      <div class="sec"><h3>Comparison</h3>${metricsTable(p.metrics, p.severity)}</div>
+      <div class="sec"><h3>Leaves (${p.leaves.length})</h3>${p.leaves.map(leafHtml).join("")}</div>
+    </section>`;
+  }
+  $("results").innerHTML = h;
+}
+function leafHtml(l){
+  const i = l.images, m = l.metrics;
+  return `<details class="leaf"><summary>
+      <b>Leaf ${l.idx}</b>
+      <span class="sub">IoU bicubic ${num(m.bicubic.iou, 2)} | SR3 ${num(m.sr3.iou, 2)}</span>
+      <span class="sub">new area bicubic ${num(m.bicubic.new_pct_of_leaf, 1)}% | SR3 ${num(m.sr3.new_pct_of_leaf, 1)}%</span>
+    </summary><div class="body">
+      <div class="imgs c4">
+        ${fig(i.original, "Original")}${fig(i.degraded, "Degraded (low-res)", "px")}${fig(i.bicubic, "Bicubic")}${fig(i.sr3, "SR3")}
+      </div>
+      <div class="imgs c5">
+        ${fig(i.lesions_original, "Lesions: original")}${fig(i.lesions_bicubic, "Lesions: bicubic")}${fig(i.lesions_sr3, "Lesions: SR3")}
+        ${fig(i.bicubic_vs_original, "Bicubic vs original")}${fig(i.sr3_vs_original, "SR3 vs original")}
+      </div>${legend}
+      ${metricsTable(m, {original: l.sev_original, bicubic: l.sev_bicubic, sr3: l.sev_sr3})}
+    </div></details>`;
+}
+
+/* ---------- lightbox ---------- */
+document.addEventListener("click", e => {
+  const img = e.target.closest("img[data-zoom]");
+  if (img){ $("lbimg").src = img.src; $("lbimg").className = img.closest("figure.px") ? "px" : ""; $("lb").classList.add("on"); }
+});
+$("lb").onclick = () => $("lb").classList.remove("on");
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("lb").classList.remove("on"); });
+</script>
+</body>
+</html>
